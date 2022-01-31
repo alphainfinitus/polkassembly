@@ -5,7 +5,11 @@
 import { ChainLinksType, ChainPropType } from '../types';
 
 export const network = {
+	BIFROST: 'bifrost',
+	KILT: 'kilt',
 	KUSAMA: 'kusama',
+	MOONBEAM: 'moonbeam',
+	MOONRIVER: 'moonriver',
 	POLKADOT: 'polkadot'
 };
 

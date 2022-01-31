@@ -20,24 +20,23 @@ interface Props {
 	onChainId: string
 }
 
-const Median = (data: any): [BN, BN, string, string] => {
+const Median = (data: any, members: string[]): [BN, BN, string, string] => {
 	let median = new BN(0);
 	let findersFee = new BN(0);
 	let receiver = '';
 	let finder = '';
 
 	if (data?.tips?.length > 0) {
-		const values: BN[] = data.tips.map(([, value]: [string, BN]) => value);
+		const values: BN[] = data.tips.map(([, value]: [string, BN]) => value).sort((a: BN, b: BN) => new BN(a).cmp(new BN(b)));
 		const midIndex = Math.floor(values.length / 2);
 		median = values.length
 			? values.length % 2
 				? values[midIndex]
 				: new BN(values[midIndex - 1]).add(new BN(values[midIndex])).divn(2)
 			: new BN(0);
-
 		receiver = data.who;
 		finder = data.finder;
-		if (data.finder != data.who && median != new BN(0)) {
+		if (data.finder != data.who && !members.includes(data.finder) && median != new BN(0)) {
 			findersFee = new BN(median).divn(5); // 20% of median value
 			median = new BN(median).sub(findersFee);
 
@@ -54,7 +53,9 @@ const TipInfo = ({ className, onChainId }: Props) => {
 	const [isTippersLoading, setIsTippersLoading] = useState(true);
 	const [members, setMembers] = useState<string[]>([]);
 	const [median, setMedian] = useState<BN>(new BN(0));
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [findersFee, setFindersFee] = useState<BN>(new BN(0));
+	//eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [finder, setFinder] = useState<string>('');
 	const [receiver, setReceiver] = useState<string>('');
 
@@ -69,10 +70,14 @@ const TipInfo = ({ className, onChainId }: Props) => {
 
 		let unsubscribe: () => void;
 
+		api.query.council.members().then((members) => {
+			setMembers(members.map(member => member.toString()));
+		});
+
 		api.query.tips.tips.multi([onChainId]).then(tip => {
 			setTips(tip[0]?.toJSON());
 			setIsTippersLoading(false);
-			const [adjustedMedian, findersFee, finder, receiver] = Median(tip[0]?.toJSON());
+			const [adjustedMedian, findersFee, finder, receiver] = Median(tip[0]?.toJSON(), members);
 			setMedian(adjustedMedian);
 			setFindersFee(findersFee);
 			setReceiver(receiver);
@@ -80,12 +85,8 @@ const TipInfo = ({ className, onChainId }: Props) => {
 
 		});
 
-		api.query.council.members().then((members) => {
-			setMembers(members.map(member => member.toString()));
-		});
-
 		return () => unsubscribe && unsubscribe();
-	}, [api, apiReady, isTippersLoading, onChainId]);
+	}, [api, apiReady, isTippersLoading, onChainId, members]);
 
 	const pendingTippers = members.filter(item => !tips?.tips.includes(item));
 
@@ -95,19 +96,6 @@ const TipInfo = ({ className, onChainId }: Props) => {
 				<Card className={className}>
 					<h3>Final Tip<HelperTooltip content='The final value of the tip is decided based on the median of all tips issued by the tippers' /></h3>
 					<Grid>
-						{finder != receiver ?
-							<Grid.Row key={finder}>
-								<Grid.Column width={12}>
-									<div className='item'>
-										<h6>Proposer</h6>
-										<Address address={finder} />
-									</div>
-								</Grid.Column>
-								<Grid.Column width={4}>
-									{formatBnBalance(findersFee, { numberAfterComma: 2, withUnit: true })}
-								</Grid.Column>
-							</Grid.Row>
-							: <></>}
 						<Grid.Row key={receiver}>
 							<Grid.Column width={12}>
 								<div className='item'>

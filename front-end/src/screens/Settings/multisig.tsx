@@ -7,7 +7,8 @@ import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { stringToHex } from '@polkadot/util';
 import styled from '@xstyled/styled-components';
 import React, { useContext, useState } from 'react';
-import { DropdownProps } from 'semantic-ui-react';
+import { DropdownProps, Icon } from 'semantic-ui-react';
+import HelperTooltip from 'src/ui-components/HelperTooltip';
 
 import { ApiContext } from '../../context/ApiContext';
 import { NotificationContext } from '../../context/NotificationContext';
@@ -18,6 +19,7 @@ import { chainProperties } from '../../global/networkConstants';
 import { handleTokenChange } from '../../services/auth.service';
 import { NotificationStatus } from '../../types';
 import AccountSelectionForm from '../../ui-components/AccountSelectionForm';
+import AddressComponent from '../../ui-components/Address';
 import Button from '../../ui-components/Button';
 import FilteredError from '../../ui-components/FilteredError';
 import { Form } from '../../ui-components/Form';
@@ -32,10 +34,13 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 	const currentUser = useContext(UserDetailsContext);
 	const [showModal, setShowModal] = useState(false);
 	const [multisigAddress, setMultisigAddress] = useState<string>('');
-	const [signatories, setSignatories] = useState<string>('');
+	const [signatories, setSignatories] = useState<any>({ 0: '' });
 	const [threshold, setThreshold] = useState(0);
 	const [signatory, setSignatory] = useState<string>('');
+	const [showSignatoryAccounts, setShowSignatoryAccounts] = useState(false);
+	const [signatoryAccounts, setSignatoryAccounts] = useState<InjectedAccountWithMeta[]>([]);
 	const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
+	const [extensionNotAvailable, setExtensionNotAvailable] = useState(false);
 	const [extensionNotFound, setExtensionNotFound] = useState(false);
 	const [accountsNotFound, setAccountsNotFound] = useState(false);
 	const [linkStarted, setLinkStarted] = useState(false);
@@ -52,11 +57,67 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 	};
 
 	const onAddressChange = (event: React.ChangeEvent<HTMLInputElement>) => setMultisigAddress(event.currentTarget.value);
-	const onSignatoriesChange = (event: React.ChangeEvent<HTMLInputElement>) => setSignatories(event.currentTarget.value);
 	const onThresholdChange = (event: React.ChangeEvent<HTMLInputElement>) => setThreshold(Number(event.currentTarget.value));
 	const onAccountChange = (event: React.SyntheticEvent<HTMLElement, Event>, data: DropdownProps) => {
 		const addressValue = data.value as string;
 		setSignatory(addressValue);
+	};
+
+	const isSelected = (address: string) => {
+		let isSelected = false;
+		Object.keys(signatories).forEach((key) => {
+			if (signatories[key] === address) {
+				isSelected = true;
+			}
+		});
+		return isSelected;
+	};
+
+	const getSignatoriesArray = () => {
+		const signatoriesArray: any[] = [];
+		Object.keys(signatories).forEach((key) => {
+			if(signatories[key] !== '') {
+				signatoriesArray.push(signatories[key]);
+			}
+		});
+		return signatoriesArray;
+	};
+
+	const onSignatoriesAddressChange = (e:any) => {
+		setSignatories({ ...signatories, [e.target.id]: e.target.value });
+	};
+
+	const onSignatoriesAddressRemove = (e:any) => {
+		const oldSignatories = { ...signatories };
+		delete oldSignatories[e.target.id];
+		let i = 0;
+		const newSignatories = {};
+		Object.keys(oldSignatories).forEach((key) => {
+			// @ts-ignore
+			newSignatories[i] = oldSignatories[key];
+			i++;
+		});
+		setSignatories(newSignatories);
+	};
+
+	const handleAddSignatories = (address = '') => {
+		if (!isSelected(address)) {
+			setSignatories({ ...signatories, [Object.keys(signatories).length]: address });
+		}
+	};
+
+	const handleDetect = async () => {
+		const extensions = await web3Enable(APPNAME);
+		if (extensions.length === 0) {
+			setExtensionNotAvailable(true);
+			return;
+		} else {
+			setExtensionNotAvailable(false);
+		}
+
+		const allAccounts = await web3Accounts();
+		setSignatoryAccounts(allAccounts);
+		setShowSignatoryAccounts(!showSignatoryAccounts);
 	};
 
 	const handleLink = async (): Promise<undefined> => {
@@ -84,7 +145,7 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 		});
 
 		const accounts = availableAccounts.filter((account) => {
-			return signatories.split(',').map(address => address.trim()).filter(address => !!address).includes(account.address);
+			return getSignatoriesArray().map(address => address.trim()).filter(address => !!address).includes(account.address);
 		});
 
 		if (accounts.length === 0) {
@@ -135,11 +196,10 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 				data: stringToHex(multisigLinkStartResult.data.multisigLinkStart.signMessage || ''),
 				type: 'bytes'
 			});
-
 			const multisigLinkConfirmResult = await multisigLinkConfirmMutation({
 				variables: {
 					address: multisigAddress,
-					addresses: signatories,
+					addresses: getSignatoriesArray().join(','),
 					network: NETWORK,
 					signatory,
 					signature,
@@ -169,6 +229,26 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 		}
 	};
 
+	const getSignatoryAccounts = () => {
+		return (
+			<Form.Group className='fullWidth'>
+				<Form.Field className='fullWidth '>
+					{signatoryAccounts.map(account => {
+						const address = getEncodedAddress(account.address);
+
+						return address &&
+							<div key={address} onClick={() => handleAddSignatories(address)} className='signatoryItem'>
+								<div className='item'>
+									<AddressComponent className='item' address={address} extensionName={account.meta.name} />
+								</div>
+								{isSelected(address) ? <Icon name='check circle outline' /> : <Icon name='add circle' />}
+							</div>;
+					})}
+				</Form.Field>
+			</Form.Group>
+		);
+	};
+
 	return (
 		<>
 			{showModal ?
@@ -192,12 +272,6 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 									onClick={handleLink}
 								/>
 							}
-							<Button
-								content='Close'
-								icon='close'
-								secondary
-								onClick={dismissModal}
-							/>
 						</Form.Group>
 					}
 					centered
@@ -210,29 +284,49 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 					<Form standalone={false}>
 						<Form.Group>
 							<Form.Field width={16}>
-								<label>Multisig Address</label>
+								<label>
+									Signatory Addresses
+									<HelperTooltip content='The signatories (aka co-owners) have the ability to create transactions using the multisig and approve transactions sent by others. But, only once the threshold (set while creating a multisig account) is reached with approvals, the multisig transaction is enacted on-chain.' />
+								</label>
+								{Object.keys(signatories).map(i => (
+									<div key={i} className="signatoryChild">
+										<input key={i} id={i} value={signatories[i]} onChange={onSignatoriesAddressChange} placeholder='Enter signatory addresses for multisig account' />
+										<div className="closeIcon"><Icon name='minus circle' id={i} onClick={onSignatoriesAddressRemove}/></div>
+									</div>
+								))}
+								{!extensionNotAvailable && <div className='signatoryOptions'>
+									<div onClick={handleDetect} className='signatoryToggle'>
+										Choose from available addresses
+										{showSignatoryAccounts ? <Icon name='chevron up' /> : <Icon name='chevron down' />}
+									</div>
+									<div className='signatoryToggle' onClick={() => handleAddSignatories('')}>+ Add account address</div>
+								</div>}
+								{extensionNotAvailable && <div className="error">Please install polkadot.js extension</div>}
+							</Form.Field>
+						</Form.Group>
+						<Form.Group>
+							{showSignatoryAccounts && signatoryAccounts.length > 0 && getSignatoryAccounts()}
+						</Form.Group>
+						<Form.Group>
+							<Form.Field width={16}>
+								<label>
+									Multisig Address
+									<HelperTooltip content='This is the address of the multisig account with the above signatories.' />
+								</label>
 								<input
 									value={multisigAddress}
 									onChange={onAddressChange}
-									placeholder='address'
+									placeholder='Enter valid multisig address'
 									type='text'
 								/>
 							</Form.Field>
 						</Form.Group>
 						<Form.Group>
 							<Form.Field width={16}>
-								<label>Comma Seperated List of Signatories Addresses</label>
-								<input
-									value={signatories}
-									onChange={onSignatoriesChange}
-									placeholder='signatories'
-									type='text'
-								/>
-							</Form.Field>
-						</Form.Group>
-						<Form.Group>
-							<Form.Field width={16}>
-								<label>Threshold</label>
+								<label>
+									Threshold
+									<HelperTooltip content='Threshold is the amount of signature weight required to authorize any transaction. The threshold for approval should be less or equal to the number of signatories for a multisig.' />
+								</label>
 								<input
 									value={threshold || ''}
 									onChange={onThresholdChange}
@@ -289,8 +383,33 @@ const Multisig = ({ className }: {className?: string}): JSX.Element => {
 };
 
 export default styled(Multisig)`
+	.fullWidth {
+		width: 100%;
+	}
+	.signatoryItem {
+		margin-bottom: 10px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
 	.error {
 		color: red_secondary;
 		font-size: sm;
+	}
+	.signatoryOptions{ 
+		display: flex;
+		justify-content: space-between;
+	}
+	.signatoryToggle {
+		color: pink_primary;
+		cursor: pointer;
+	}
+	.signatoryChild {
+		position: relative;
+	}
+	.closeIcon {
+		position: absolute;
+		top: 11px;
+		right: 4px;
 	}
 `;
