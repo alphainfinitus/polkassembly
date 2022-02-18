@@ -6,7 +6,8 @@ import styled from '@xstyled/styled-components';
 import { ApolloQueryResult } from 'apollo-client';
 import React, { useContext, useEffect,useState } from 'react';
 import { Controller,useForm } from 'react-hook-form';
-import { GoCheck, GoX } from 'react-icons/go';
+import { GoCheck, GoLink, GoX } from 'react-icons/go';
+import { Input, InputOnChangeData } from 'semantic-ui-react';
 
 import { NotificationContext } from '../context/NotificationContext';
 import { DiscussionPostAndCommentsQuery,
@@ -21,12 +22,15 @@ import { DiscussionPostAndCommentsQuery,
 	TipPostFragment,
 	TreasuryProposalPostAndCommentsQuery,
 	TreasuryProposalPostFragment,
+	useDiscussionPostAndCommentsLazyQuery,
 	useEditPostMutation
 } from '../generated/graphql';
 import { NotificationStatus } from '../types';
 import Button from '../ui-components/Button';
 import FilteredError from '../ui-components/FilteredError';
 import { Form } from '../ui-components/Form';
+import Loader from '../ui-components/Loader';
+import Modal from '../ui-components/Modal';
 import ContentForm from './ContentForm';
 import PostContent from './Post/PostContent';
 import TitleForm from './TitleForm';
@@ -48,11 +52,14 @@ interface Props {
 }
 
 const EditablePostContent = ({ className, isEditing, isTipProposal, onchainId, post, postStatus, refetch, toggleEdit }: Props) => {
+	const [showModal, setShowModal] = useState(false);
 	const { author, content, title } = post;
 	const [newContent, setNewContent] = useState(content || '');
 	const [newTitle, setNewTitle] = useState(title || '');
 	const { queueNotification } = useContext(NotificationContext);
-	const {  control, errors, handleSubmit, setValue } = useForm();
+	const { control, errors, handleSubmit, setValue } = useForm();
+	const [linkPostId, setLinkPostId] = useState('');
+	const [validationError, setValidationError] = useState('');
 
 	const handleCancel = () => {
 		toggleEdit();
@@ -91,6 +98,49 @@ const EditablePostContent = ({ className, isEditing, isTipProposal, onchainId, p
 		}
 	});
 
+	const [discussionPostQuery, { data, loading }] = useDiscussionPostAndCommentsLazyQuery();
+
+	const handleLink = () => {
+		if (!linkPostId) {
+			setValidationError('Please enter a valid post id');
+		}
+
+		if (isNaN(Number(linkPostId))) {
+			setValidationError('Please enter a valid post id number');
+		}
+
+		try {
+			discussionPostQuery({ variables: { id: Number(linkPostId) } });
+
+			if (data && data.posts && data.posts.length) {
+				if (data.posts[0].title) {
+					setValue('title', data.posts[0].title);
+					setNewTitle(data.posts[0].title);
+				}
+				if  (data.posts[0].content) {
+					setValue('content', data.posts[0].content);
+					setNewContent(data.posts[0].content);
+				}
+			}
+		} catch (error) {
+			setValidationError(error.message);
+		}
+
+		dismissModal();
+	};
+
+	const openModal = () => {
+		setShowModal(true);
+	};
+
+	const dismissModal = () => {
+		setShowModal(false);
+	};
+
+	const onLinkPostIdChange = (event: React.FormEvent<HTMLInputElement>, data: InputOnChangeData) => {
+		setLinkPostId(data.value?.toString() || '');
+	};
+
 	useEffect(() => {
 		if (isEditing) {
 			setValue('content',content);
@@ -98,10 +148,67 @@ const EditablePostContent = ({ className, isEditing, isTipProposal, onchainId, p
 		}
 	},[content, isEditing, setValue, title]);
 
+	useEffect(() => {
+		if (data && data.posts && data.posts.length) {
+			if (data.posts[0].title) {
+				setValue('title', data.posts[0].title);
+				setNewTitle(data.posts[0].title);
+			}
+			if  (data.posts[0].content) {
+				setValue('content', data.posts[0].content);
+				setNewContent(data.posts[0].content);
+			}
+		}
+	}, [data, setValue]);
+
 	if (!author || !author.username || !content) return <div>Post content or author could not be found.</div>;
 
 	return (
 		<>
+			{showModal ?
+				<Modal
+					buttons={
+						<Form.Group>
+							<Button
+								content='Link'
+								icon='chain'
+								primary
+								disabled={loading}
+								onClick={handleLink}
+							/>
+							<Button
+								content='Close'
+								icon='close'
+								secondary
+								onClick={dismissModal}
+							/>
+						</Form.Group>
+					}
+					centered
+					dimmer='inverted'
+					open
+					onClose={dismissModal}
+					size='tiny'
+					title={'Post Id to link'}
+				>
+					<Form standalone={false}>
+						<Form.Group>
+							<Form.Field width={16}>
+								<Input
+									name={'linkPostId'}
+									placeholder={'Post Id'}
+									onChange={onLinkPostIdChange}
+									value={linkPostId || ''}
+								/>
+							</Form.Field>
+						</Form.Group>
+						{loading && <Loader text={'fetching...'}/>}
+						{error?.message && <FilteredError text={error.message}/>}
+						{validationError && <FilteredError text={validationError}/>}
+					</Form>
+				</Modal>
+				: null
+			}
 			<div className={className}>
 				{error?.message && <FilteredError text={error.message}/>}
 				{
@@ -127,8 +234,11 @@ const EditablePostContent = ({ className, isEditing, isTipProposal, onchainId, p
 								rules={{ required: true }}
 							/>
 							<div className='button-container'>
-								<Button secondary size='small' onClick={handleCancel}><GoX className='icon'/>Cancel</Button>
-								<Button primary size='small' onClick={handleSubmit(handleSave)}><GoCheck className='icon'/>Save</Button>
+								<Button secondary size='small' onClick={openModal}><GoLink className='icon'/>Link Post</Button>
+								<span>
+									<Button secondary size='small' onClick={handleCancel}><GoX className='icon'/>Cancel</Button>
+									<Button primary size='small' onClick={handleSubmit(handleSave)}><GoCheck className='icon'/>Save</Button>
+								</span>
 							</div>
 						</Form>
 						:
@@ -147,6 +257,6 @@ export default styled(EditablePostContent)`
 	.button-container {
 		width: 100%;
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
 	}
 `;

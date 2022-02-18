@@ -170,8 +170,18 @@ const LoginForm = ({ className, toggleWeb2Login }:Props): JSX.Element => {
 							primary
 							disabled={loading}
 							type='submit'
+							className='button'
 						>
 							Login
+						</Button>
+
+						<Button
+							secondary
+							disabled={loading}
+							onClick={handleToggle}
+							className='button'
+						>
+							Login with username
 						</Button>
 					</div>
 				</>
@@ -180,13 +190,12 @@ const LoginForm = ({ className, toggleWeb2Login }:Props): JSX.Element => {
 				{error?.message && <FilteredError className='info' text={error.message}/>}
 			</div>
 			<Divider horizontal>Or</Divider>
+
+			<div className='text-center'> Haven&apos;t used Polkassembly before? Sign up! </div>
+
 			<div className={'mainButtonContainer'}>
-				<Button
-					secondary
-					disabled={loading}
-					onClick={handleToggle}
-				>
-					Login with username
+				<Button secondary onClick={() => history.push('/signup')} type='button' className='button pink_primary-text'>
+					Sign-up
 				</Button>
 			</div>
 		</Form>
@@ -197,14 +206,19 @@ export default styled(LoginForm)`
 	.mainButtonContainer {
 		align-items: center;
 		display: flex;
-		flex-direction: row;
 		justify-content: center;
+		flex-direction: column;
 	}
 
 	input.error {
 		border-style: solid;
 		border-width: 1px;
 		border-color: red_secondary;
+	}
+
+	.text-center{
+		text-align: center;
+		margin-bottom: 0.3em;
 	}
 
 	.info {
@@ -217,5 +231,15 @@ export default styled(LoginForm)`
 
 	.ui.dimmer {
 		height: calc(100% - 6.5rem);
+	}
+
+	.button {
+		width: 80%;
+		margin: 4px 0;
+		height: 40px;
+	}
+
+	.pink_primary-text{
+		color: pink_primary !important;
 	}
 `;

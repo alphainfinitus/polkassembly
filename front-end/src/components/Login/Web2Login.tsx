@@ -53,7 +53,9 @@ const LoginForm = ({ className, toggleWeb2Login }:Props): JSX.Element => {
 
 	return (
 		<Form className={className} onSubmit={handleSubmit(handleSubmitForm)}>
-			<h3>Login</h3>
+			<h3>
+				Login
+			</h3>
 			<Form.Group>
 				<Form.Field width={16}>
 					<label>Username</label>
@@ -94,6 +96,7 @@ const LoginForm = ({ className, toggleWeb2Login }:Props): JSX.Element => {
 					primary
 					disabled={loading}
 					type='submit'
+					className='button'
 				>
 					Login
 				</Button>
@@ -101,16 +104,28 @@ const LoginForm = ({ className, toggleWeb2Login }:Props): JSX.Element => {
 			<div>
 				{error?.message && <FilteredError text={error.message}/>}
 			</div>
-			<Divider horizontal>Or</Divider>
+
 			<div className={'mainButtonContainer'}>
 				<Button
 					secondary
 					disabled={loading}
 					onClick={handleToggle}
+					className='button'
 				>
 					Login with web3 address
 				</Button>
 			</div>
+
+			<Divider horizontal>Or</Divider>
+
+			<div className='text-center'> Haven&apos;t used Polkassembly before? Sign up! </div>
+
+			<div className={'mainButtonContainer'}>
+				<Button secondary onClick={() => history.push('/signup')} type='button' className='button pink_primary-text'>
+						Sign-up
+				</Button>
+			</div>
+
 		</Form>
 	);
 };
@@ -123,6 +138,11 @@ export default styled(LoginForm)`
 		justify-content: center;
 	}
 
+	.text-center{
+		text-align: center;
+		margin-bottom: 0.3em;
+	}
+
 	input.error {
 		border-style: solid;
 		border-width: 1px;
@@ -131,5 +151,15 @@ export default styled(LoginForm)`
 
 	.errorText {
 		color: red_secondary;
+	}
+
+	.button {
+		width: 80%;
+		margin: 4px 0;
+		height: 40px;
+	}
+
+	.pink_primary-text{
+		color: pink_primary !important;
 	}
 `;

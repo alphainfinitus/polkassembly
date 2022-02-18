@@ -337,3 +337,21 @@ export interface ChangeAboutArgs {
     image: string;
     signature: string;
 }
+
+export interface CreatePostArgs {
+    network: Network;
+    address: string;
+    title: string;
+    content: string;
+    signature: string;
+}
+
+export interface EditPostArgs {
+    network: Network;
+    address: string;
+    title: string;
+    content: string;
+    signature: string;
+    proposalType: string;
+    proposalId: string;
+}

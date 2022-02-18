@@ -63,7 +63,9 @@ const SignupForm = ({ className, toggleWeb2Signup }:Props): JSX.Element => {
 
 	return (
 		<Form className={className} onSubmit={handleSubmit(handleSubmitForm)}>
-			<h3>Sign Up</h3>
+			<h3>
+				Sign Up
+			</h3>
 			<Form.Group>
 				<Form.Field width={16}>
 					<label>Username<sup>*</sup></label>
@@ -135,15 +137,20 @@ const SignupForm = ({ className, toggleWeb2Signup }:Props): JSX.Element => {
 					Sign-up
 				</Button>
 				{error?.message && <FilteredError text={error.message}/>}
-			</div>
-			<Divider horizontal>Or</Divider>
-			<div className={'mainButtonContainer'}>
+
 				<Button
 					secondary
 					disabled={loading}
 					onClick={handleToggle}
 				>
 					Sign-up with Web3 address
+				</Button>
+			</div>
+			<Divider horizontal>Or</Divider>
+			<div className={'mainButtonContainer'}>
+				<div className='text-center'> Already have an account ? Log In! </div>
+				<Button secondary onClick={() => history.push('/login')} type='button' className='button pink_primary-text'>
+					Login
 				</Button>
 			</div>
 		</Form>
@@ -181,5 +188,20 @@ export default styled(SignupForm)`
 			border-bottom-width: 1px;
 			border-bottom-color: grey_primary;
 		}
+	}
+
+	.text-center{
+		text-align: center;
+		margin-bottom: 0.3em;
+	}
+
+	.button {
+		width: 80%;
+		margin: 4px 0;
+		height: 40px;
+	}
+
+	.pink_primary-text{
+		color: pink_primary !important;
 	}
 `;

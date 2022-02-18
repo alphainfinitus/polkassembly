@@ -16,7 +16,11 @@ import changeEmailMutation from './mutation/changeEmail';
 import changeNotificationPreference from './mutation/changeNotificationPreference';
 import changePasswordMutation from './mutation/changePassword';
 import changeUsernameMutation from './mutation/changeUsername';
+import createPostConfirm from './mutation/createPostConfirm';
+import createPostStart from './mutation/createPostStart';
 import deleteAccount from './mutation/deleteAccount';
+import editPostConfirm from './mutation/editPostConfirm';
+import editPostStart from './mutation/editPostStart';
 import loginMutation from './mutation/login';
 import logoutMutation from './mutation/logout';
 import multisigLinkConfirm from './mutation/multisigLinkConfirm';
@@ -90,6 +94,10 @@ export default gql`
 		${changeEmailMutation}
 		${changePasswordMutation}
 		${changeNotificationPreference}
+		${createPostConfirm}
+		${createPostStart}
+		${editPostConfirm}
+		${editPostStart}
 		${deleteAccount}
 		${loginMutation}
 		${logoutMutation}

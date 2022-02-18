@@ -7,6 +7,7 @@ import * as argon2 from 'argon2';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import jwt from 'jsonwebtoken';
 import moment from 'moment';
+import fetch from 'node-fetch';
 import { uuid } from 'uuidv4';
 import validator from 'validator';
 
@@ -43,6 +44,7 @@ const passphrase = process.env.NODE_ENV === 'test' ? process.env.JWT_KEY_PASSPHR
 const SIX_MONTHS = 6 * 30 * 24 * 60 * 60 * 1000;
 export const ONE_DAY = 24 * 60 * 60; // (expressed in seconds)
 export const ADDRESS_LOGIN_TTL = 5 * 60; // 5 min (expressed in seconds)
+export const CREATE_POST_TTL = 60 * 60; // 1 hour (expressed in seconds)
 const NOTIFICATION_DEFAULTS = {
 	new_proposal: false,
 	own_proposal: true,
@@ -56,6 +58,8 @@ export const getAddressSignupKey = (address: string): string => `ASU-${address}`
 export const getSetCredentialsKey = (address: string): string => `SCR-${address}`;
 export const getEmailVerificationTokenKey = (token: string): string => `EVT-${token}`;
 export const getMultisigAddressKey = (address: string): string => `MLA-${address}`;
+export const getCreatePostKey = (address: string): string => `CPT-${address}`;
+export const getEditPostKey = (address: string): string => `EPT-${address}`;
 
 export default class AuthService {
 	public async GetUser (token: string): Promise<User> {
@@ -1004,5 +1008,231 @@ export default class AuthService {
 			});
 
 		return refreshToken.token;
+	}
+
+	public async CreatePostStart (address: string): Promise<string> {
+		const signMessage = uuid();
+
+		await redisSetex(getCreatePostKey(address), CREATE_POST_TTL, signMessage);
+
+		return signMessage;
+	}
+
+	public async CreatePostConfirm (
+		network: Network,
+		address: string,
+		title: string,
+		content: string,
+		signature: string
+	): Promise<void> {
+		const challenge = await redisGet(getCreatePostKey(address));
+
+		if (!challenge) {
+			throw new ForbiddenError(messages.POST_CREATE_SIGN_MESSAGE_EXPIRED);
+		}
+
+		const signContent = `<Bytes>network:${network}::address:${address}::title:${title}::content:${content}::challenge:${challenge}</Bytes>`;
+
+		const isValidSr = verifySignature(signContent, address, signature);
+
+		if (!isValidSr) {
+			throw new ForbiddenError(messages.POST_CREATE_INVALID_SIGNATURE);
+		}
+
+		const addressObj = await Address
+			.query()
+			.where('address', address)
+			.first();
+
+		let user;
+
+		if (!addressObj) {
+			// Create new user
+			const randomUsername = uuid().split('-').join('').substring(0, 25);
+			const password = uuid();
+
+			user = await this.createUser('', password, randomUsername, true);
+
+			await this.createAddress(network, address, true, user.id);
+		} else {
+			user = await User
+				.query()
+				.findById(addressObj.user_id);
+		}
+
+		await redisDel(getCreatePostKey(address));
+
+		if (!user) {
+			return;
+		}
+
+		const token = await this.getSignedToken(user);
+
+		const createPostQuery = `mutation createPost($userId: Int!, $content: String!, $topicId: Int!, $title: String!) {
+			__typename
+			insert_posts(
+			  objects: {author_id: $userId, content: $content, title: $title, topic_id: $topicId}
+			) {
+			  affected_rows
+			  returning {
+				id
+				__typename
+			  }
+			  __typename
+			}
+		}`;
+
+		const request = {
+			body: JSON.stringify({
+				operationName: 'createPost',
+				query: createPostQuery,
+				variables: {
+					content,
+					title,
+					topicId: 1,
+					userId: user.id
+				}
+			}),
+			headers: {
+				authorization: `Bearer ${token}`,
+				'content-type': 'application/json'
+			},
+			method: 'POST'
+		};
+
+		const uri = `https://${network}.${process.env.DOMAIN_NAME}/v1/graphql`;
+
+		await fetch(uri, request);
+	}
+
+	public async EditPostStart (address: string): Promise<string> {
+		const signMessage = uuid();
+
+		await redisSetex(getEditPostKey(address), CREATE_POST_TTL, signMessage);
+
+		return signMessage;
+	}
+
+	public async EditPostConfirm (
+		network: Network,
+		address: string,
+		title: string,
+		content: string,
+		signature: string,
+		proposalType: string,
+		proposalId: string
+	): Promise<void> {
+		const challenge = await redisGet(getEditPostKey(address));
+
+		if (!challenge) {
+			throw new ForbiddenError(messages.POST_EDIT_SIGN_MESSAGE_EXPIRED);
+		}
+
+		const signContent = `<Bytes>network:${network}::address:${address}::title:${title}::content:${content}::challenge:${challenge}</Bytes>`;
+
+		const isValidSr = verifySignature(signContent, address, signature);
+
+		if (!isValidSr) {
+			throw new ForbiddenError(messages.POST_EDIT_INVALID_SIGNATURE);
+		}
+
+		const addressObj = await Address
+			.query()
+			.where('address', address)
+			.first();
+
+		let user;
+
+		if (!addressObj) {
+			// Create new user
+			const randomUsername = uuid().split('-').join('').substring(0, 25);
+			const password = uuid();
+
+			user = await this.createUser('', password, randomUsername, true);
+
+			await this.createAddress(network, address, true, user.id);
+		} else {
+			user = await User
+				.query()
+				.findById(addressObj.user_id);
+		}
+
+		await redisDel(getCreatePostKey(address));
+
+		if (!user) {
+			return;
+		}
+
+		const token = await this.getSignedToken(user);
+
+		const fetchPostQuery = `
+			query MyQuery($proposal_id: Int!) {
+				onchain_links(where: {onchain_${proposalType}_id: {_eq: $proposal_id}}) {
+					post_id
+			}
+		}
+	  `;
+
+		const getPost = {
+			body: JSON.stringify({
+				query: fetchPostQuery,
+				variables: {
+					proposal_id: proposalId
+				}
+			}),
+			headers: {
+				authorization: `Bearer ${token}`,
+				'content-type': 'application/json'
+			},
+			method: 'POST'
+		};
+
+		const api = `https://${network}.${process.env.DOMAIN_NAME}/v1/graphql`;
+
+		const post = await fetch(api, getPost);
+
+		const { errors, data } = await post.json();
+
+		if (errors) {
+			throw new ForbiddenError(messages.ERROR_IN_POST_EDIT);
+		}
+
+		const post_id = data[0]?.post_id;
+
+		const editPostQuery = `mutation editPost($userId: Int!, $content: String!, $topicId: Int!, $title: String!, $postId: String!) {
+			__typename
+			update_posts(where: {id: {_eq: $postId}}, _set: {author_id: $userId, content: $content, title: $title, topic_id: $topicId}
+			) {
+			  affected_rows
+			  returning {
+				id
+				__typename
+			  }
+			  __typename
+			}
+		}`;
+
+		const request = {
+			body: JSON.stringify({
+				operationName: 'editPost',
+				query: editPostQuery,
+				variables: {
+					content,
+					postId: post_id,
+					title,
+					topicId: 1,
+					userId: user.id
+				}
+			}),
+			headers: {
+				authorization: `Bearer ${token}`,
+				'content-type': 'application/json'
+			},
+			method: 'POST'
+		};
+
+		const uri = `https://${network}.${process.env.DOMAIN_NAME}/v1/graphql`;
+
+		await fetch(uri, request);
 	}
 }

@@ -200,6 +200,14 @@ const SignupForm = ({ className, toggleWeb2Signup }:Props): JSX.Element => {
 						>
 							Sign-up
 						</Button>
+
+						<Button
+							secondary
+							disabled={loading}
+							onClick={handleToggle}
+						>
+							Sign-up with username
+						</Button>
 					</div>
 				</>
 			}
@@ -208,12 +216,9 @@ const SignupForm = ({ className, toggleWeb2Signup }:Props): JSX.Element => {
 			</div>
 			<Divider horizontal>Or</Divider>
 			<div className={'mainButtonContainer'}>
-				<Button
-					secondary
-					disabled={loading}
-					onClick={handleToggle}
-				>
-					Sign-up with username
+				<div className='text-center'> Already have an account ? Log In! </div>
+				<Button secondary onClick={() => history.push('/login')} type='button' className='button pink_primary-text'>
+					Login
 				</Button>
 			</div>
 		</Form>
@@ -224,7 +229,7 @@ export default styled(SignupForm)`
 	.mainButtonContainer {
 		align-items: center;
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
 		justify-content: center;
 		margin-top: 3rem;
 	}
@@ -260,5 +265,20 @@ export default styled(SignupForm)`
 
 	.ui.dimmer {
 		height: calc(100% - 6.5rem);
+	}
+
+	.text-center{
+		text-align: center;
+		margin-bottom: 0.3em;
+	}
+
+	.button {
+		width: 80%;
+		margin: 4px 0;
+		height: 40px;
+	}
+
+	.pink_primary-text{
+		color: pink_primary !important;
 	}
 `;
