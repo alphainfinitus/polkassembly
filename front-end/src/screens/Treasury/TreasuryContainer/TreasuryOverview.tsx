@@ -129,43 +129,73 @@ const TreasuryOverview = () => {
 
 	}
 
-	async function fetchUSDCPrice(dot: number, callType: USDCallType) {
-		const response = await fetch(
-			'https://polkadot.api.subscan.io/api/open/price_converter',
-			{
-				body: JSON.stringify({
-					from: 'DOT',
-					quote: 'USD',
-					value: dot
-				}),
-				headers: {
-					Accept: 'application/json',
-					'Content-Type': 'application/json',
-					'X-API-Key': 'cf41f0b0e400974bc0a3db0455ce9e11'
-				},
-				method: 'POST'
-			}
-		);
-		const responseJSON = await response.json();
-		if (responseJSON['message'] == 'Success') {
-			const formattedUSD = getUSDWithUnits(responseJSON['data']['output']);
-			if (callType == USDCallType.Available) {
-				setAvailableUSD(formattedUSD);
-			} else if (callType == USDCallType.NextBurn) {
-				setNextBurnUSD(formattedUSD);
-			}
-		}
-	}
-
 	// fetch available DOT to USD price whenever available DOT changes
 	useEffect(() => {
 		const dot_available: number = parseFloat(resultValue.toString());
+
+		async function fetchUSDCPrice(dot: number, callType: USDCallType) {
+			const response = await fetch(
+				'https://polkadot.api.subscan.io/api/open/price_converter',
+				{
+					body: JSON.stringify({
+						from: 'DOT',
+						quote: 'USD',
+						value: dot
+					}),
+					headers: {
+						Accept: 'application/json',
+						'Content-Type': 'application/json',
+						'X-API-Key': 'cf41f0b0e400974bc0a3db0455ce9e11'
+					},
+					method: 'POST'
+				}
+			);
+			const responseJSON = await response.json();
+			if (responseJSON['message'] == 'Success') {
+				const formattedUSD = getUSDWithUnits(responseJSON['data']['output']);
+				if (callType == USDCallType.Available) {
+					setAvailableUSD(formattedUSD);
+				} else if (callType == USDCallType.NextBurn) {
+					setNextBurnUSD(formattedUSD);
+				}
+			}
+		}
+
 		fetchUSDCPrice(dot_available, USDCallType.Available);
 	}, [resultValue]);
 
 	// fetch Next Burn DOT to USD price whenever Next Burn DOT changes
 	useEffect(() => {
 		const dot_burn: number = parseFloat(resultBurn.toString());
+
+		async function fetchUSDCPrice(dot: number, callType: USDCallType) {
+			const response = await fetch(
+				'https://polkadot.api.subscan.io/api/open/price_converter',
+				{
+					body: JSON.stringify({
+						from: 'DOT',
+						quote: 'USD',
+						value: dot
+					}),
+					headers: {
+						Accept: 'application/json',
+						'Content-Type': 'application/json',
+						'X-API-Key': 'cf41f0b0e400974bc0a3db0455ce9e11'
+					},
+					method: 'POST'
+				}
+			);
+			const responseJSON = await response.json();
+			if (responseJSON['message'] == 'Success') {
+				const formattedUSD = getUSDWithUnits(responseJSON['data']['output']);
+				if (callType == USDCallType.Available) {
+					setAvailableUSD(formattedUSD);
+				} else if (callType == USDCallType.NextBurn) {
+					setNextBurnUSD(formattedUSD);
+				}
+			}
+		}
+
 		fetchUSDCPrice(dot_burn, USDCallType.NextBurn);
 	}, [resultBurn]);
 
